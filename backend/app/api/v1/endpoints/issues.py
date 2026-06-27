@@ -9,6 +9,7 @@ from app.api.deps import get_current_citizen, get_current_authority
 from app.services.issue_service import (
     create_issue, get_issue_by_id, list_issues, get_issue_timeline,
     transition_issue_state, can_citizen_act_on_resolution,
+    add_issue_support,
 )
 from app.schemas.issues import IssueCreateRequest, IssueResponse, IssueListResponse, TimelineListResponse
 from app.agents.intake_agent import run_intake_agent
@@ -227,6 +228,22 @@ def dispute_resolution(
             actor_type="citizen",
             description="Resolution disputed by citizen",
         )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    return issue
+
+@router.post("/{issue_id}/support", response_model=IssueResponse)
+def support_issue(
+    issue_id: UUID,
+    citizen: dict = Depends(get_current_citizen),
+    db: Session = Depends(get_db),
+):
+    """Add support/upvote to an issue. Citizen auth required."""
+    try:
+        issue = add_issue_support(db, issue_id, citizen["id"])
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

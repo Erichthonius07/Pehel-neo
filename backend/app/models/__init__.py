@@ -61,7 +61,7 @@ class User(Base):
 
     issues = relationship("Issue", back_populates="user")
     supports = relationship("IssueSupport", back_populates="user")
-    # bookmarks: polymorphic — access via user.bookmarks
+    # bookmarks: polymorphic ï¿½ access via user.bookmarks
     comments = relationship("IssueComment", back_populates="user")
 
 
@@ -305,6 +305,18 @@ class AgentLog(Base):
     processing_time_ms = Column(Integer)
     error_message = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class IssueSupporter(Base):
+    __tablename__ = "issue_supporters"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    issue_id = Column(UUID(as_uuid=True), ForeignKey("issues.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("issue_id", "user_id", name="uq_issue_supporter"),
+    )
 
 
 class PatternCluster(Base):

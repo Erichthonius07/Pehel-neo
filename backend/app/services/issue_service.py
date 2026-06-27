@@ -8,6 +8,7 @@ from sqlalchemy import text
 
 from app.models import Issue, IssueTimeline, Ward, City, User
 from app.core.constants import IssueState, IssueCategory
+from app.models import Issue, IssueTimeline, Ward, City, User, IssueSupporter
 
 # SLA config: (ack_hours, visit_hours, resolution_hours, time_decay_days)
 SLA_CONFIG = {
@@ -121,18 +122,61 @@ def get_issue_timeline(db: Session, issue_id: UUID):
 
 
 def can_citizen_act_on_resolution(db: Session, issue_id: UUID, user_id: UUID) -> bool:
-    """Check if citizen can confirm/dispute resolution (reporter or supporter only)."""
+    """Check if citizen is the reporter or a supporter of the issue."""
     issue = db.query(Issue).filter(Issue.id == issue_id).first()
     if not issue:
         return False
+
+    # Reporter can always act
     if issue.user_id == user_id:
         return True
-    from app.models import IssueSupport
-    support = db.query(IssueSupport).filter(
-        IssueSupport.issue_id == issue_id,
-        IssueSupport.user_id == user_id
+
+    # Supporters can act
+    supporter = db.query(IssueSupporter).filter(
+        IssueSupporter.issue_id == issue_id,
+        IssueSupporter.user_id == user_id
     ).first()
-    return support is not None
+    return supporter is not None
+
+
+def add_issue_support(db: Session, issue_id: UUID, user_id: UUID) -> Issue:
+    """Add citizen support to an issue. Raises ValueError on business rule violations."""
+    issue = db.query(Issue).filter(Issue.id == issue_id).first()
+    if not issue:
+        raise ValueError("Issue not found")
+
+    # Reporter cannot support their own issue
+    if issue.user_id == user_id:
+        raise ValueError("Reporter cannot support their own issue")
+
+    # Check if already supported
+    existing = db.query(IssueSupporter).filter(
+        IssueSupporter.issue_id == issue_id,
+        IssueSupporter.user_id == user_id
+    ).first()
+    if existing:
+        raise ValueError("Already supported this issue")
+
+    # Add support record
+    supporter = IssueSupporter(issue_id=issue_id, user_id=user_id)
+    db.add(supporter)
+
+    # Increment counter
+    issue.support_count += 1
+
+    # Timeline event
+    timeline = IssueTimeline(
+        issue_id=issue_id,
+        event_type="support_added",
+        actor_type="citizen",
+        actor_id=user_id,
+        description="Citizen added support to issue",
+    )
+    db.add(timeline)
+
+    db.commit()
+    db.refresh(issue)
+    return issue
 
 
 # Full state machine per Pehel Neo spec
