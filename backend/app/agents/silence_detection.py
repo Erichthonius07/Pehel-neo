@@ -1,94 +1,76 @@
 """Silence Detection Agent — monitors issues for SLA breaches and inactivity.
 
 This agent runs on a schedule (e.g., daily cron) and:
-1. Finds issues that have breached SLA deadlines (ack, visit, resolution)
+1. Finds issues that have breached SLA deadlines
 2. Finds issues with no activity for extended periods
-3. Escalates by creating timeline events and updating issue state
+3. Escalates by creating timeline events
 4. Logs all actions to agent_logs
-
-Can be triggered manually or via APScheduler cron job.
 """
 
-import json
 from uuid import UUID
 from datetime import datetime, timedelta
 from typing import List
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
 
 from app.models import Issue, IssueTimeline, AgentLog
-from app.core.constants import IssueState
-
-# SLA breach thresholds
-SLA_BREACH_THRESHOLDS = {
-    "acknowledge": 48,   # hours
-    "visit": 120,        # hours (5 days)
-    "resolution": 240,    # hours (10 days)
-}
 
 
-def _get_breached_issues(db: Session, breach_type: str, hours: int) -> List[Issue]:
-    """Find issues that have breached a specific SLA deadline."""
+def _get_breached_issues(db: Session) -> List[Issue]:
+    """Find issues that have breached their SLA deadlines."""
     now = datetime.utcnow()
 
-    if breach_type == "acknowledge":
-        return (
-            db.query(Issue)
-            .filter(
-                Issue.state.in_(["reported", "acknowledged"]),
-                Issue.sla_ack_deadline < now,
+    return (
+        db.query(Issue)
+        .filter(
+            Issue.state.notin_(["closed", "resolved_confirmed"]),
+            (
+                (Issue.state.in_(["reported", "acknowledged"]) & (Issue.sla_ack_deadline < now))
+                | (Issue.state.in_(["acknowledged", "visited"]) & (Issue.sla_visit_deadline < now))
+                | (Issue.state.in_(["in_progress", "resolved_claimed"]) & (Issue.sla_resolution_deadline < now))
             )
-            .all()
         )
-    elif breach_type == "visit":
-        return (
-            db.query(Issue)
-            .filter(
-                Issue.state.in_(["acknowledged", "visited"]),
-                Issue.sla_visit_deadline < now,
-            )
-            .all()
-        )
-    elif breach_type == "resolution":
-        return (
-            db.query(Issue)
-            .filter(
-                Issue.state.in_(["in_progress", "resolved_claimed"]),
-                Issue.sla_resolution_deadline < now,
-            )
-            .all()
-        )
-    return []
+        .all()
+    )
 
 
-def _create_sla_breach_event(db: Session, issue: Issue, breach_type: str) -> None:
+def _create_sla_breach_event(db: Session, issue: Issue) -> None:
     """Create timeline event and log for SLA breach."""
-    description = f"SLA breach: {breach_type} deadline exceeded"
+    now = datetime.utcnow()
+    breached_deadlines = []
 
-    timeline = IssueTimeline(
-        issue_id=issue.id,
-        event_type="sla_breach",
-        actor_type="system",
-        description=description,
-    )
-    db.add(timeline)
+    if issue.state in ["reported", "acknowledged"] and issue.sla_ack_deadline and issue.sla_ack_deadline < now:
+        breached_deadlines.append("acknowledge")
+    if issue.state in ["acknowledged", "visited"] and issue.sla_visit_deadline and issue.sla_visit_deadline < now:
+        breached_deadlines.append("visit")
+    if issue.state in ["in_progress", "resolved_claimed"] and issue.sla_resolution_deadline and issue.sla_resolution_deadline < now:
+        breached_deadlines.append("resolution")
 
-    log = AgentLog(
-        agent_name="silence_detection",
-        issue_id=issue.id,
-        action=f"sla_breach_{breach_type}",
-        input_summary=f"state={issue.state}, deadline_field=sla_{breach_type}_deadline",
-        output_summary=description,
-    )
-    db.add(log)
+    for deadline in breached_deadlines:
+        description = f"SLA breach: {deadline} deadline exceeded"
+
+        timeline = IssueTimeline(
+            issue_id=issue.id,
+            event_type="sla_breach",
+            actor_type="system",
+            description=description,
+        )
+        db.add(timeline)
+
+        log = AgentLog(
+            agent_name="silence_detection",
+            issue_id=issue.id,
+            action=f"sla_breach_{deadline}",
+            input_summary=f"state={issue.state}, deadline={deadline}",
+            output_summary=description,
+        )
+        db.add(log)
 
 
 def _get_silent_issues(db: Session, days: int = 7) -> List[Issue]:
     """Find issues with no timeline activity for N days."""
     cutoff = datetime.utcnow() - timedelta(days=days)
 
-    # Subquery: issues with recent activity
     from sqlalchemy import func
     recent_activity = (
         db.query(IssueTimeline.issue_id)
@@ -97,7 +79,6 @@ def _get_silent_issues(db: Session, days: int = 7) -> List[Issue]:
         .subquery()
     )
 
-    # Issues NOT in recent activity, but still open
     return (
         db.query(Issue)
         .filter(
@@ -139,9 +120,7 @@ def run_silence_detection() -> dict:
 
     db = SessionLocal()
     stats = {
-        "sla_breach_acknowledge": 0,
-        "sla_breach_visit": 0,
-        "sla_breach_resolution": 0,
+        "sla_breaches": 0,
         "silent_issues": 0,
         "total_flagged": 0,
         "errors": [],
@@ -149,29 +128,20 @@ def run_silence_detection() -> dict:
 
     try:
         # Check SLA breaches
-        for breach_type, hours in SLA_BREACH_THRESHOLDS.items():
-            breached = _get_breached_issues(db, breach_type, hours)
-            key = f"sla_breach_{breach_type}"
-            stats[key] = len(breached)
-
-            for issue in breached:
-                _create_sla_breach_event(db, issue, breach_type)
+        breached = _get_breached_issues(db)
+        for issue in breached:
+            _create_sla_breach_event(db, issue)
+            stats["sla_breaches"] += 1
 
         # Check silent issues (7+ days no activity)
         silent = _get_silent_issues(db, days=7)
-        stats["silent_issues"] = len(silent)
-
         for issue in silent:
             _create_silence_event(db, issue, days_inactive=7)
+            stats["silent_issues"] += 1
 
         db.commit()
 
-        stats["total_flagged"] = (
-            stats["sla_breach_acknowledge"]
-            + stats["sla_breach_visit"]
-            + stats["sla_breach_resolution"]
-            + stats["silent_issues"]
-        )
+        stats["total_flagged"] = stats["sla_breaches"] + stats["silent_issues"]
 
     except Exception as e:
         db.rollback()
@@ -215,11 +185,11 @@ def run_silence_detection_for_issue(issue_id: UUID) -> dict:
         now = datetime.utcnow()
 
         # Check SLA breaches
-        if issue.state in ["reported", "acknowledged"] and issue.sla_ack_deadline < now:
+        if issue.state in ["reported", "acknowledged"] and issue.sla_ack_deadline and issue.sla_ack_deadline < now:
             result["sla_breaches"].append("acknowledge")
-        if issue.state in ["acknowledged", "visited"] and issue.sla_visit_deadline < now:
+        if issue.state in ["acknowledged", "visited"] and issue.sla_visit_deadline and issue.sla_visit_deadline < now:
             result["sla_breaches"].append("visit")
-        if issue.state in ["in_progress", "resolved_claimed"] and issue.sla_resolution_deadline < now:
+        if issue.state in ["in_progress", "resolved_claimed"] and issue.sla_resolution_deadline and issue.sla_resolution_deadline < now:
             result["sla_breaches"].append("resolution")
 
         # Check silence

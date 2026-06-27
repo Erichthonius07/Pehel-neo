@@ -1,6 +1,7 @@
 """Intake Agent — classifies civic issues using Groq LLM."""
 import json
 import re
+import sys
 from uuid import UUID
 from datetime import datetime
 
@@ -80,8 +81,12 @@ def run_intake_agent(issue_id: UUID) -> None:
         if not issue:
             return
 
-        # Skip if already processed
-        if issue.ai_summary:
+        # Skip if already processed — check agent_logs, not ai_summary
+        existing = db.query(AgentLog).filter(
+            AgentLog.issue_id == issue_id,
+            AgentLog.action == "intake_complete"
+        ).first()
+        if existing:
             return
 
         result = _call_llm(
@@ -93,7 +98,6 @@ def run_intake_agent(issue_id: UUID) -> None:
         severity = result.get("severity", "medium")
         is_safety_risk = result.get("is_safety_risk", False)
         confidence = result.get("confidence", 50)
-        structured_title = result.get("structured_title", issue.title)
         structured_description = result.get("structured_description", issue.description)
 
         priority_score = _calculate_initial_priority_score(severity, is_safety_risk, confidence)
@@ -105,6 +109,8 @@ def run_intake_agent(issue_id: UUID) -> None:
         issue.priority_score = priority_score
         issue.confidence_ai = confidence
 
+        # Explicit flush to ensure SQLAlchemy tracks changes before commit
+        db.flush()
         db.commit()
 
         # Log success
@@ -141,8 +147,8 @@ def run_intake_agent(issue_id: UUID) -> None:
             )
             db.add(log)
             db.commit()
-        except Exception:
-            pass  # Don't let logging failure crash the background task
+        except Exception as inner_e:
+            print(f"INTAKE AGENT CRITICAL ERROR: {inner_e}", file=sys.stderr)
 
     finally:
         db.close()
