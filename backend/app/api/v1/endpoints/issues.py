@@ -13,6 +13,7 @@ from app.services.issue_service import (
 )
 from app.schemas.issues import IssueCreateRequest, IssueResponse, IssueListResponse, TimelineListResponse
 from app.agents.intake_agent import run_intake_agent
+from app.agents.resolution_validator import run_resolution_validator
 
 router = APIRouter(prefix="/issues", tags=["issues"])
 
@@ -165,10 +166,11 @@ def start_work(
 @router.post("/{issue_id}/resolve", response_model=IssueResponse)
 def resolve_issue(
     issue_id: UUID,
+    background_tasks: BackgroundTasks,
     authority: dict = Depends(get_current_authority),
     db: Session = Depends(get_db),
 ):
-    """Authority claims resolution."""
+    """Authority claims resolution. Triggers Resolution Validator in background."""
     try:
         issue = transition_issue_state(
             db, issue_id, authority["id"], "resolved_claimed",
@@ -180,6 +182,10 @@ def resolve_issue(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+
+    # Trigger Resolution Validator in background
+    background_tasks.add_task(run_resolution_validator, issue.id)
+
     return issue
 
 
