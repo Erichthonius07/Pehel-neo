@@ -1,0 +1,55 @@
+﻿# Environment — NEVER commit secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Alembic
+alembic/versions/__pycache__/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Docker
+docker-compose.override.yml
+
+# Node / Next.js (frontend)
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Coverage
+.coverage
+htmlcov/
+
+# Misc
+*.db
+*.sqlite
+*.sqlite3
