@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 from typing import Optional, List
 from datetime import datetime
+from pydantic import BaseModel
 
 from app.db.base import get_db
 from app.api.deps import get_current_citizen, get_current_authority
@@ -13,11 +14,15 @@ from app.models import IssueComment, Issue, IssueTimeline, User, AuthorityUser
 router = APIRouter(prefix="/issues", tags=["comments"])
 
 
+class CommentCreate(BaseModel):
+    message_text: str
+    parent_id: Optional[UUID] = None
+
+
 @router.post("/{issue_id}/comments")
 def add_comment(
     issue_id: UUID,
-    message: str,
-    parent_id: Optional[UUID] = None,
+    body: CommentCreate,
     citizen: dict = Depends(get_current_citizen),
     db: Session = Depends(get_db),
 ):
@@ -25,6 +30,9 @@ def add_comment(
     issue = db.query(Issue).filter(Issue.id == issue_id).first()
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
+
+    message = body.message_text
+    parent_id = body.parent_id
 
     # Validate parent_id
     if parent_id:
@@ -81,8 +89,7 @@ def add_comment(
 @router.post("/{issue_id}/comments/authority")
 def add_authority_comment(
     issue_id: UUID,
-    message: str,
-    parent_id: Optional[UUID] = None,
+    body: CommentCreate,
     authority: dict = Depends(get_current_authority),
     db: Session = Depends(get_db),
 ):
@@ -90,6 +97,9 @@ def add_authority_comment(
     issue = db.query(Issue).filter(Issue.id == issue_id).first()
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
+
+    message = body.message_text
+    parent_id = body.parent_id
 
     # Validate parent_id
     if parent_id:

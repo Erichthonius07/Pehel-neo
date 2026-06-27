@@ -1,4 +1,4 @@
-from sqlalchemy import (
+﻿from sqlalchemy import (
     Column, String, Integer, BigInteger, Numeric, Boolean, DateTime, Text, ForeignKey, UniqueConstraint, Index, CheckConstraint, Sequence
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
@@ -61,7 +61,7 @@ class User(Base):
 
     issues = relationship("Issue", back_populates="user")
     supports = relationship("IssueSupport", back_populates="user")
-    # bookmarks: polymorphic � access via user.bookmarks
+    # bookmarks: polymorphic ï¿½ access via user.bookmarks
     comments = relationship("IssueComment", back_populates="user")
 
 
@@ -214,6 +214,9 @@ class IssueComment(Base):
     authority_user_id = Column(UUID(as_uuid=True), ForeignKey("authority_users.id"))
     is_agent = Column(Boolean, default=False)
     message_text = Column(Text, nullable=False)
+    parent_id = Column(UUID(as_uuid=True), ForeignKey('issue_comments.id'), nullable=True)
+    author_type = Column(String(20), nullable=False, server_default='citizen')
+    author_label = Column(String(150), nullable=True)
     agent_metadata = Column(JSONB)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

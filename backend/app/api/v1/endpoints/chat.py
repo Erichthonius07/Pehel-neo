@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from uuid import UUID
+from pydantic import BaseModel
 
 from app.db.base import get_db
 from app.api.deps import get_current_citizen
@@ -10,10 +11,14 @@ from app.api.deps import get_current_citizen
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
+class ChatRequest(BaseModel):
+    question: str
+
+
 @router.post("/issue/{issue_id}")
 def chat_about_issue(
     issue_id: UUID,
-    question: str,
+    body: ChatRequest,
     citizen: dict = Depends(get_current_citizen),
     db: Session = Depends(get_db),
 ):
@@ -23,7 +28,7 @@ def chat_about_issue(
     """
     from app.agents.narrative_agent import answer_issue_query
     
-    result = answer_issue_query(issue_id, question)
+    result = answer_issue_query(issue_id, body.question)
     
     if "error" in result and result["error"]:
         raise HTTPException(status_code=404, detail=result["error"])

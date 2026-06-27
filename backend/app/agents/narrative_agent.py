@@ -101,7 +101,8 @@ def _build_full_timeline_text(db: Session, issue_id: UUID) -> str:
 
 def _get_sla_status(issue) -> str:
     """Get human-readable SLA status."""
-    now = datetime.utcnow()
+    from datetime import timezone
+    now = datetime.now(timezone.utc)
     if issue.state in ["closed", "resolved_confirmed"]:
         return "Completed"
     if issue.sla_resolution_deadline and issue.sla_resolution_deadline < now:
@@ -109,8 +110,6 @@ def _get_sla_status(issue) -> str:
     if issue.sla_ack_deadline and issue.sla_ack_deadline < now:
         return "Acknowledgement overdue"
     return "On track"
-
-
 def _call_narrative_llm(issue, state_label: str, timeline_summary: str, ward_name: str) -> str:
     """Call Groq LLM to generate narrative summary."""
     prompt = NARRATIVE_PROMPT.format(
@@ -154,7 +153,7 @@ def _call_chat_llm(ai_summary: str, state_label: str, timeline_text: str, questi
     return response.choices[0].message.content.strip()
 
 
-def run_narrative_agent(issue_id: UUID) -> None:
+def run_narrative_agent(issue_id: UUID) -> dict:
     """Generate/update plain-language summary. Call as background task."""
     from app.db.base import SessionLocal
     from app.models import Ward
@@ -165,7 +164,7 @@ def run_narrative_agent(issue_id: UUID) -> None:
     try:
         issue = db.query(Issue).filter(Issue.id == issue_id).first()
         if not issue:
-            return
+            return {"error": "Issue not found", "narrative": "", "key_delays": [], "current_status": ""}
 
         # Check if already processed recently
         existing = db.query(AgentLog).filter(
@@ -200,6 +199,7 @@ def run_narrative_agent(issue_id: UUID) -> None:
         db.add(log)
         db.commit()
 
+        return {"narrative": narrative[:500], "key_delays": [], "current_status": state_label}
     except Exception as e:
         try:
             db.rollback()
@@ -229,7 +229,7 @@ def answer_issue_query(issue_id: UUID, question: str) -> dict:
     try:
         issue = db.query(Issue).filter(Issue.id == issue_id).first()
         if not issue:
-            result["answer"] = "Issue not found."
+            return {"error": "Issue not found", "narrative": "", "key_delays": [], "current_status": ""}
             return result
 
         state_label = _get_state_label(issue.state)
