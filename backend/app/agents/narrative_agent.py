@@ -1,4 +1,4 @@
-﻿"""Narrative Agent — generates human-readable issue summaries and chat answers."""
+﻿"""Narrative Agent - generates human-readable issue summaries and chat answers."""
 
 import json
 import re
@@ -15,15 +15,15 @@ settings = get_settings()
 client = Groq(api_key=settings.GROQ_API_KEY)
 
 STATE_LABELS = {
-    "reported": "Reported — awaiting acknowledgement",
-    "acknowledged": "Acknowledged — authority has seen this",
-    "visited": "Site visited — inspection completed",
+    "reported": "Reported - awaiting acknowledgement",
+    "acknowledged": "Acknowledged - authority has seen this",
+    "visited": "Site visited - inspection completed",
     "in_progress": "Work in progress",
-    "resolved_claimed": "Resolution claimed — pending verification",
+    "resolved_claimed": "Resolution claimed - pending verification",
     "resolved_confirmed": "Resolved and verified",
-    "resolution_unverified": "Resolution unverified — evidence inconclusive",
-    "disputed": "Disputed — resolution contested by citizens",
-    "reopened": "Reopened — previous resolution failed",
+    "resolution_unverified": "Resolution unverified - evidence inconclusive",
+    "disputed": "Disputed - resolution contested by citizens",
+    "reopened": "Reopened - previous resolution failed",
     "closed": "Closed",
 }
 
@@ -153,7 +153,7 @@ def _call_chat_llm(ai_summary: str, state_label: str, timeline_text: str, questi
     return response.choices[0].message.content.strip()
 
 
-def run_narrative_agent(issue_id: UUID) -> dict:
+def run_narrative_agent(issue_id: UUID) -> None:
     """Generate/update plain-language summary. Call as background task."""
     from app.db.base import SessionLocal
     from app.models import Ward
@@ -164,7 +164,7 @@ def run_narrative_agent(issue_id: UUID) -> dict:
     try:
         issue = db.query(Issue).filter(Issue.id == issue_id).first()
         if not issue:
-            return {"error": "Issue not found", "narrative": "", "key_delays": [], "current_status": ""}
+            return
 
         # Check if already processed recently
         existing = db.query(AgentLog).filter(
@@ -199,9 +199,13 @@ def run_narrative_agent(issue_id: UUID) -> dict:
         db.add(log)
         db.commit()
 
-        return {"narrative": narrative[:500], "key_delays": [], "current_status": state_label}
     except Exception as e:
+        import sys
+        print(f"NARRATIVE AGENT ERROR: {e}", file=sys.stderr)
+        import sys
+        print(f"NARRATIVE AGENT ERROR: {e}", file=sys.stderr)
         try:
+            db.rollback()
             db.rollback()
             log = AgentLog(
                 agent_name="narrative",
@@ -229,7 +233,7 @@ def answer_issue_query(issue_id: UUID, question: str) -> dict:
     try:
         issue = db.query(Issue).filter(Issue.id == issue_id).first()
         if not issue:
-            return {"error": "Issue not found", "narrative": "", "key_delays": [], "current_status": ""}
+            return
             return result
 
         state_label = _get_state_label(issue.state)

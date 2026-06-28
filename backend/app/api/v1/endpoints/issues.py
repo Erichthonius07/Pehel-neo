@@ -261,12 +261,13 @@ def support_issue(
 @router.post("/{issue_id}/narrative")
 def get_narrative(
     issue_id: UUID,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     """Generate narrative summary for an issue. Public — no auth required."""
     from app.agents.narrative_agent import run_narrative_agent
-    result = run_narrative_agent(issue_id)
-    return result
+    background_tasks.add_task(run_narrative_agent, issue_id)
+    return {"status": "accepted", "issue_id": str(issue_id), "message": "Narrative generation started"}
 
 @router.post("/{issue_id}/media/upload-url")
 def get_media_upload_url(
@@ -282,7 +283,6 @@ def get_media_upload_url(
     """
     from app.services.storage_service import generate_upload_url
     return generate_upload_url(issue_id, media_type, content_type)
-
 
 @router.post("/{issue_id}/media/confirm")
 def confirm_media_upload(
