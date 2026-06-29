@@ -202,10 +202,7 @@ def run_narrative_agent(issue_id: UUID) -> None:
     except Exception as e:
         import sys
         print(f"NARRATIVE AGENT ERROR: {e}", file=sys.stderr)
-        import sys
-        print(f"NARRATIVE AGENT ERROR: {e}", file=sys.stderr)
         try:
-            db.rollback()
             db.rollback()
             log = AgentLog(
                 agent_name="narrative",

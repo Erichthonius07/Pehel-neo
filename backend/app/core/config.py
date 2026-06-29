@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+﻿from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
 
@@ -21,6 +21,23 @@ class Settings(BaseSettings):
     S3_SECRET_KEY: str = "pehelminio123"
     S3_BUCKET: str = "pehel-media"
     S3_REGION: str = "us-east-1"
+
+    # MinIO aliases (storage_service.py uses these names)
+    @property
+    def MINIO_ENDPOINT(self) -> str:
+        return self.S3_ENDPOINT
+
+    @property
+    def MINIO_ACCESS_KEY(self) -> str:
+        return self.S3_ACCESS_KEY
+
+    @property
+    def MINIO_SECRET_KEY(self) -> str:
+        return self.S3_SECRET_KEY
+
+    @property
+    def MINIO_BUCKET(self) -> str:
+        return self.S3_BUCKET
     ENVIRONMENT: str = "development"
     CORS_ORIGINS: str = "http://localhost:3000"
     PILOT_CITY: str = "Kanpur"

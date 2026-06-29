@@ -1,4 +1,4 @@
-"""Issue service with state machine and SLA logic."""
+﻿"""Issue service with state machine and SLA logic."""
 from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 from typing import Optional, Tuple
@@ -8,7 +8,7 @@ from sqlalchemy import text
 
 from app.models import Issue, IssueTimeline, Ward, City, User
 from app.core.constants import IssueState, IssueCategory
-from app.models import Issue, IssueTimeline, Ward, City, User, IssueSupporter
+from app.models import Issue, IssueTimeline, Ward, City, User, IssueSupport
 
 # SLA config: (ack_hours, visit_hours, resolution_hours, time_decay_days)
 SLA_CONFIG = {
@@ -107,7 +107,7 @@ def get_issue_by_id(db: Session, issue_id: UUID) -> Optional[Issue]:
 
 
 def list_issues(db: Session, ward_id: Optional[UUID] = None, category: Optional[str] = None, limit: int = 20, offset: int = 0):
-    query = db.query(Issue).order_by(Issue.created_at.desc())
+    query = db.query(Issue).order_by(Issue.priority_score.desc().nulls_last(), Issue.created_at.desc())
     if ward_id:
         query = query.filter(Issue.ward_id == ward_id)
     if category:
@@ -132,9 +132,9 @@ def can_citizen_act_on_resolution(db: Session, issue_id: UUID, user_id: UUID) ->
         return True
 
     # Supporters can act
-    supporter = db.query(IssueSupporter).filter(
-        IssueSupporter.issue_id == issue_id,
-        IssueSupporter.user_id == user_id
+    supporter = db.query(IssueSupport).filter(
+        IssueSupport.issue_id == issue_id,
+        IssueSupport.user_id == user_id
     ).first()
     return supporter is not None
 
@@ -150,15 +150,15 @@ def add_issue_support(db: Session, issue_id: UUID, user_id: UUID) -> Issue:
         raise ValueError("Reporter cannot support their own issue")
 
     # Check if already supported
-    existing = db.query(IssueSupporter).filter(
-        IssueSupporter.issue_id == issue_id,
-        IssueSupporter.user_id == user_id
+    existing = db.query(IssueSupport).filter(
+        IssueSupport.issue_id == issue_id,
+        IssueSupport.user_id == user_id
     ).first()
     if existing:
         raise ValueError("Already supported this issue")
 
     # Add support record
-    supporter = IssueSupporter(issue_id=issue_id, user_id=user_id)
+    supporter = IssueSupport(issue_id=issue_id, user_id=user_id)
     db.add(supporter)
 
     # Increment counter

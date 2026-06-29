@@ -275,12 +275,9 @@ def get_media_upload_url(
     media_type: str = "complaint_photo",
     content_type: str = "image/jpeg",
     citizen: dict = Depends(get_current_citizen),
+    db: Session = Depends(get_db),
 ):
-    """Get presigned URL for media upload.
-    
-    media_type: complaint_photo | resolution_photo | visit_photo | audio
-    content_type: image/jpeg | image/png | audio/mpeg
-    """
+    """Get presigned URL for media upload."""
     from app.services.storage_service import generate_upload_url
     return generate_upload_url(issue_id, media_type, content_type)
 

@@ -126,6 +126,7 @@ class Issue(Base):
     confidence_time = Column(Numeric(5, 2))
     net_confidence = Column(Numeric(5, 2))
     confidence_updated_at = Column(DateTime(timezone=True))
+    confidence_label = Column(String(20))
     priority_score = Column(Numeric(6, 2), default=0)
     support_count = Column(Integer, default=0)
     is_safety_risk = Column(Boolean, default=False)
@@ -309,17 +310,6 @@ class AgentLog(Base):
     error_message = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-class IssueSupporter(Base):
-    __tablename__ = "issue_supporters"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    issue_id = Column(UUID(as_uuid=True), ForeignKey("issues.id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    __table_args__ = (
-        UniqueConstraint("issue_id", "user_id", name="uq_issue_supporter"),
-    )
 
 
 class PatternCluster(Base):

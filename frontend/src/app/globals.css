@@ -1,0 +1,85 @@
+﻿@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-surface-primary: #F7F5F0;
+  --color-surface-secondary: #F0F2F4;
+  --color-surface-pure: #FFFFFF;
+  --color-surface-elevated: #FFFFFF;
+  --color-border-light: #E5E3DE;
+  --color-border-medium: #D0CEC9;
+  --color-border-heavy: #1A1A1A;
+  --color-text-primary: #1A1A1A;
+  --color-text-secondary: #6B6B6B;
+  --color-text-muted: #9B9B9B;
+  --color-text-inverse: #FFFFFF;
+  --color-roads: #C24B2A;
+  --color-water: #0D6B6E;
+  --color-garbage: #6B7A2A;
+  --color-priority-high: #C41E1E;
+  --color-priority-medium: #B87A00;
+  --color-priority-low: #4A7A4A;
+  --color-priority-critical: #C41E1E;
+  --color-authority-badge: #1A2B5F;
+  --color-system-badge: #C41E1E;
+  --color-citizen-badge: #0D6B6E;
+}
+
+* {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: 'Inter', 'Helvetica Neue', system-ui, sans-serif;
+  background-color: var(--color-surface-primary);
+  color: var(--color-text-primary);
+}
+
+@layer components {
+  .label-text {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-secondary);
+  }
+  .hairline {
+    height: 1px;
+    background: var(--color-border-light);
+    width: 100%;
+    border: none;
+  }
+  .chapter-break {
+    height: 3px;
+    background: var(--color-border-heavy);
+    width: 100%;
+    border: none;
+  }
+  .data-number {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    line-height: 1.0;
+    letter-spacing: -0.02em;
+  }
+  .mono-text {
+    font-family: 'JetBrains Mono', 'SF Mono', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+}
+
+.leaflet-container {
+  font-family: 'Inter', 'Helvetica Neue', system-ui, sans-serif !important;
+}
+.leaflet-control-zoom a {
+  border-radius: 0 !important;
+  border: 1px solid var(--color-border-medium) !important;
+  background: white !important;
+  color: var(--color-text-primary) !important;
+}

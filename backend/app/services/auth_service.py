@@ -1,4 +1,4 @@
-"""Auth service layer for OTP, JWT, and user management."""
+﻿"""Auth service layer for OTP, JWT, and user management."""
 import hashlib
 import random
 import string
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 
 from app.core.config import get_settings
-from app.core.security import get_password_hash, verify_password, create_access_token, ALGORITHM, ALGORITHM
+from app.core.security import get_password_hash, verify_password, create_access_token, ALGORITHM
 from app.models import User, AuthorityUser, OTPStore
 
 settings = get_settings()

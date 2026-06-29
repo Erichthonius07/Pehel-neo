@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 
 from app.db.base import get_db
@@ -12,8 +12,8 @@ router = APIRouter(prefix="/geo", tags=["geo"])
 def list_cities(db: Session = Depends(get_db)):
     """List all cities."""
     from app.models import City
-    cities = db.query(City).all()
-    return [{"id": str(c.id), "name": c.name, "state": c.state} for c in cities]
+    cities = db.query(City).options(joinedload(City.state)).all()
+    return [{"id": str(c.id), "name": c.name, "state": c.state.name if c.state else None} for c in cities]
 
 
 @router.get("/cities/{city_id}")
@@ -22,7 +22,7 @@ def get_city(city_id: str, db: Session = Depends(get_db)):
     from app.models import City, Ward
     from uuid import UUID
     
-    city = db.query(City).filter(City.id == UUID(city_id)).first()
+    city = db.query(City).options(joinedload(City.state)).filter(City.id == UUID(city_id)).first()
     if not city:
         raise HTTPException(status_code=404, detail="City not found")
     
@@ -31,7 +31,7 @@ def get_city(city_id: str, db: Session = Depends(get_db)):
     return {
         "id": str(city.id),
         "name": city.name,
-        "state": city.state,
+        "state": city.state.name if city.state else None,
         "ward_count": ward_count,
     }
 

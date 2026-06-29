@@ -1,4 +1,4 @@
-﻿from pydantic import BaseModel, Field
+﻿from pydantic import BaseModel, Field, computed_field
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
@@ -38,7 +38,21 @@ class IssueResponse(BaseModel):
     confidence_community: float = 100.0
     confidence_time: float = 0.0
     net_confidence: float = 0.0
+    ai_summary: Optional[str] = None
     created_at: datetime
+
+    @computed_field
+    @property
+    def sla_status(self) -> str:
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
+        if self.state in ["closed", "resolved_confirmed"]:
+            return "Completed"
+        if self.sla_resolution_deadline and self.sla_resolution_deadline < now:
+            return "Overdue"
+        if self.sla_ack_deadline and self.sla_ack_deadline < now:
+            return "Acknowledgement overdue"
+        return "On track"
 
     class Config:
         from_attributes = True
@@ -53,10 +67,35 @@ class IssueListResponse(BaseModel):
     severity: str
     ward_id: UUID
     support_count: int = 0
+    priority_score: int = 0
+    ai_summary: Optional[str] = None
+    sla_ack_deadline: Optional[datetime] = None
+    sla_resolution_deadline: Optional[datetime] = None
     created_at: datetime
+
+    @computed_field
+    @property
+    def sla_status(self) -> str:
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
+        if self.state in ["closed", "resolved_confirmed"]:
+            return "Completed"
+        if self.sla_resolution_deadline and self.sla_resolution_deadline < now:
+            return "Overdue"
+        if self.sla_ack_deadline and self.sla_ack_deadline < now:
+            return "Acknowledgement overdue"
+        return "On track"
 
     class Config:
         from_attributes = True
+
+class IssueWithCommentMeta(IssueListResponse):
+    last_commented_at: datetime
+    my_comment_count: int
+
+    class Config:
+        from_attributes = True
+
 
 class TimelineEventResponse(BaseModel):
     id: UUID
